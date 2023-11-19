@@ -89,6 +89,7 @@ private:
 
         window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Abisko Engine", nullptr, nullptr);
     }
+
     void mainLoop()
     {
         while (!glfwWindowShouldClose(window))
