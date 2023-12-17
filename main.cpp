@@ -1,4 +1,4 @@
-// Abisko Engine❄️ - Vilhelm Hansson / Vespera Chromatic -- Started 18-11-2023
+// Azalea Engine 🌺 (Formerly Abisko Engine❄️) - Vilhelm Hansson / Vespera Chromatic -- Started 18-11-2023
 
 // cont https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/00_Setup/03_Physical_devices_and_queue_families.html
 
@@ -17,12 +17,12 @@ const uint16_t AE_WINDOW_HEIGHT = 600;
 
 // DEBUG STUFF ----------------------------------------------------------------
 #ifdef NDEBUG // If Not Debug Mode
-const std::string WINDOW_NAME = "Abisko Engine ❄️";
+const std::string WINDOW_NAME = "Azalea Engine 🌺";
 const bool enableValidationLayers = false;
 bool aeDebugMode = false;
 
 #else
-const std::string WINDOW_NAME = "Abisko Engine ❄️ - Internal Debug Mode";
+const std::string WINDOW_NAME = "Azalea Engine 🌺 - Internal Debug Mode";
 const bool enableValidationLayers = true;
 bool aeDebugMode = true;
 #endif
@@ -140,7 +140,7 @@ private:
         appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
         appInfo.pApplicationName = "Hello Triangle";
         appInfo.applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0);
-        appInfo.pEngineName = "Abisko Engine";
+        appInfo.pEngineName = "Azalea Engine";
         appInfo.engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_3;
 
