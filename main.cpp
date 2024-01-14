@@ -263,7 +263,7 @@ private:
 };
 
 // FUNCTION PROTOTYPES
-void checkArgs(char* argv[], int argNr, HelloTriangleApplication app);
+void checkArgs(char* argv[], int argNr);
 
 
 // ############################################
@@ -277,7 +277,11 @@ int main(int argc, char *argv[])
     // Check Command Line Arguments ------------------------------------
     if (argc > 1)
     {
-        for (int i = 1; i < argc; i++) {checkArgs(argv, i, app);}
+        for (int i = 1; i < argc; i++) {checkArgs(argv, i);}
+        if (lumDebugMode == true)
+        {
+            glfwSetWindowTitle(app.getWindow(), "Labellum Engine 🌺 - Debug Mode");
+        }
     }
     // -----------------------------------------------------------------
 
@@ -295,14 +299,13 @@ int main(int argc, char *argv[])
 }
 
 // FUNCTION DEFINITIONS
-void checkArgs(char *argv[], int argNr, HelloTriangleApplication app)
+void checkArgs(char *argv[], int argNr)
 {
     std::string argument = argv[argNr];
 
     // Debug Mode Arg
     if (argument == "--debug" || argument == "-d")
     {
-        glfwSetWindowTitle(app.getWindow(), "Labellum Engine 🌺 - Debug Mode");
         lumDebugMode = true;
     }
 }
