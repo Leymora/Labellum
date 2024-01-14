@@ -12,19 +12,19 @@
 #include <string>
 
 // CONSTANT VARIABLES
-const uint16_t AE_WINDOW_WIDTH = 800;
-const uint16_t AE_WINDOW_HEIGHT = 600;
+const uint16_t LUM_WINDOW_WIDTH = 800;
+const uint16_t LUM_WINDOW_HEIGHT = 600;
 
 // DEBUG STUFF ----------------------------------------------------------------
 #ifdef NDEBUG // If Not Debug Mode
 const std::string WINDOW_NAME = "Labellum Engine 🌺";
 const bool enableValidationLayers = false;
-bool aeDebugMode = false;
+bool lumDebugMode = false;
 
 #else
 const std::string WINDOW_NAME = "Labellum Engine 🌺 - Internal Debug Mode";
 const bool enableValidationLayers = true;
-bool aeDebugMode = true;
+bool lumDebugMode = true;
 #endif
 // ----------------------------------------------------------------------------
 
@@ -58,9 +58,23 @@ public:
     {
         initVulkan();
         checkExtensions();
-        initWindow();
         mainLoop();
         cleanup();
+    }
+
+    void initWindow()
+    {
+        glfwInit();
+
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+
+        window = glfwCreateWindow(LUM_WINDOW_WIDTH, LUM_WINDOW_HEIGHT, WINDOW_NAME.c_str(), nullptr, nullptr);
+    }
+
+    GLFWwindow* getWindow()
+    {
+        return this->window;
     }
 
 private:
@@ -170,7 +184,6 @@ private:
             createInfo.enabledLayerCount = 0;
             createInfo.pNext = nullptr;
         }
-        
 
         VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
         if (result != VK_SUCCESS)
@@ -217,17 +230,6 @@ private:
         }
     }
 
-    void initWindow()
-    {
-        glfwInit();
-
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
-        window = glfwCreateWindow(AE_WINDOW_WIDTH, AE_WINDOW_HEIGHT, WINDOW_NAME.c_str(), nullptr, nullptr);
-        
-    }
-
     void mainLoop()
     {
         while (!glfwWindowShouldClose(window))
@@ -260,19 +262,47 @@ private:
     }
 };
 
+// FUNCTION PROTOTYPES
+void checkArgs(char* argv[], int argNr, HelloTriangleApplication app);
+
+
+// ############################################
+// ############# START OF MAIN ################
+// ############################################
 int main(int argc, char *argv[])
 {
     HelloTriangleApplication app;
+    app.initWindow();
+
+    // Check Command Line Arguments ------------------------------------
+    if (argc > 1)
+    {
+        for (int i = 1; i < argc; i++) {checkArgs(argv, i, app);}
+    }
+    // -----------------------------------------------------------------
 
     try
     {
         app.run();
     }
-    catch (const std::exception &e)
+    catch (const std::exception& e)
     {
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;
     }
 
     return EXIT_SUCCESS;
+}
+
+// FUNCTION DEFINITIONS
+void checkArgs(char *argv[], int argNr, HelloTriangleApplication app)
+{
+    std::string argument = argv[argNr];
+
+    // Debug Mode Arg
+    if (argument == "--debug" || argument == "-d")
+    {
+        glfwSetWindowTitle(app.getWindow(), "Labellum Engine 🌺 - Debug Mode");
+        lumDebugMode = true;
+    }
 }
