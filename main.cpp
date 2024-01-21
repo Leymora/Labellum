@@ -10,20 +10,36 @@
 #include <cstdlib>
 #include <vector>
 #include <string>
+#include <chrono>
 
 // CONSTANT VARIABLES
 const uint16_t LUM_WINDOW_WIDTH = 800;
 const uint16_t LUM_WINDOW_HEIGHT = 600;
+const int BUILD_NR = 200124;
+
+//TERMINAL STUFF https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
+const std::string TC_BELL = "\a🔔 ";
+const std::string TC_RED = "\x1B[38;5;1m";
+const std::string TC_GREEN = "\x1B[38;5;2m";
+const std::string TC_YELLOW = "\x1B[38;5;3m";
+const std::string TC_BLUE = "\x1B[38;5;4m";
+const std::string TC_PURPLE = "\x1B[38;5;5m";
+const std::string TC_CYAN = "\x1B[38;5;6m";
+const std::string TC_LUM = "\x1B[38;5;210m";
+const std::string TC_LUM2 = "\x1B[38;5;182m";
+const std::string TC_WARN = "\x1B[38;5;15m\x1B[48;5;1m";
+const std::string TC_INFO = "\x1B[38;5;15m\x1B[48;5;4m";
+const std::string TC_RESET = "\x1B[0m";
 
 // DEBUG STUFF ----------------------------------------------------------------
 #ifdef NDEBUG // If Not Debug Mode
 const std::string WINDOW_NAME = "Labellum Engine 🌺";
-const bool enableValidationLayers = false;
+bool enableValidationLayers = false;
 bool lumDebugMode = false;
 
 #else
-const std::string WINDOW_NAME = "Labellum Engine 🌺 - Internal Debug Mode";
-const bool enableValidationLayers = true;
+const std::string WINDOW_NAME = "Labellum Engine 🌺 - Debug Mode";
+bool enableValidationLayers = true;
 bool lumDebugMode = true;
 #endif
 // ----------------------------------------------------------------------------
@@ -72,7 +88,7 @@ public:
         window = glfwCreateWindow(LUM_WINDOW_WIDTH, LUM_WINDOW_HEIGHT, WINDOW_NAME.c_str(), nullptr, nullptr);
     }
 
-    GLFWwindow* getWindow()
+    GLFWwindow *getWindow()
     {
         return this->window;
     }
@@ -84,7 +100,7 @@ private:
     uint32_t glfwExtensionCount = 0;
     const char **glfwExtensions = nullptr;
 
-    std::vector<const char*> getRequiredExtensions()
+    std::vector<const char *> getRequiredExtensions()
     {
         uint32_t glfwExtensionCount = 0;
         const char **glfwExtensions;
@@ -167,7 +183,7 @@ private:
         createInfo.ppEnabledExtensionNames = glfwExtensions;
         createInfo.enabledLayerCount = 0;
         auto extensions = getRequiredExtensions();
-        
+
         VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
         createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
         createInfo.ppEnabledExtensionNames = extensions.data();
@@ -177,7 +193,7 @@ private:
             createInfo.ppEnabledLayerNames = validationLayers.data();
 
             populateDebugMessengerCreateInfo(debugCreateInfo);
-            createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT*) &debugCreateInfo;
+            createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *)&debugCreateInfo;
         }
         else
         {
@@ -203,14 +219,14 @@ private:
         setupDebugMessenger();
     }
 
-    void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo)
+    void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo)
     {
         createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
         createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
         createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
         createInfo.pfnUserCallback = debugCallback;
-    }   
+    }
 
     void setupDebugMessenger()
     {
@@ -263,8 +279,7 @@ private:
 };
 
 // FUNCTION PROTOTYPES
-void checkArgs(char* argv[], int argNr);
-
+void checkArgs(char *argv[], int argNr);
 
 // ############################################
 // ############# START OF MAIN ################
@@ -277,7 +292,10 @@ int main(int argc, char *argv[])
     // Check Command Line Arguments ------------------------------------
     if (argc > 1)
     {
-        for (int i = 1; i < argc; i++) {checkArgs(argv, i);}
+        for (int i = 1; i < argc; i++)
+        {
+            checkArgs(argv, i);
+        }
         if (lumDebugMode == true)
         {
             glfwSetWindowTitle(app.getWindow(), "Labellum Engine 🌺 - Debug Mode");
@@ -289,7 +307,7 @@ int main(int argc, char *argv[])
     {
         app.run();
     }
-    catch (const std::exception& e)
+    catch (const std::exception &e)
     {
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;
@@ -303,9 +321,16 @@ void checkArgs(char *argv[], int argNr)
 {
     std::string argument = argv[argNr];
 
-    // Debug Mode Arg
-    if (argument == "--debug" || argument == "-d")
+    //Help Arg
+    if (argument == "--help" || argument == "-h" || argument == "help"  || argument == "-help")
     {
+        std::cout << TC_BELL + TC_CYAN + "Startup Arguments: \n \t -debug / -d : Debug Mode \n" + TC_RESET << std::endl;
+    }
+    // Debug Mode Arg
+    else if (argument == "-debug" || argument == "-d")
+    {
+        std::cout << TC_LUM + "Labellum Engine 🌺 " + TC_INFO + "Debug Mode Enabled\n" + TC_RESET + "\t Build: " + std::to_string(BUILD_NR) + "\n" << std::endl;
         lumDebugMode = true;
+        enableValidationLayers = true;
     }
 }
