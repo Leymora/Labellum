@@ -12,6 +12,9 @@
 #include <string>
 #include <chrono>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 // CONSTANT VARIABLES
 const uint16_t LUM_WINDOW_WIDTH = 800;
 const uint16_t LUM_WINDOW_HEIGHT = 600;
@@ -85,7 +88,12 @@ public:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
+        //Create Main Window
         window = glfwCreateWindow(LUM_WINDOW_WIDTH, LUM_WINDOW_HEIGHT, WINDOW_NAME.c_str(), nullptr, nullptr);
+
+        //Load window icon and set it
+        windowIcon.pixels = stbi_load("LabellumIcon.png", &windowIcon.width, &windowIcon.height, 0, 4);
+        glfwSetWindowIcon(window, 1, &windowIcon);
     }
 
     GLFWwindow *getWindow()
@@ -95,6 +103,7 @@ public:
 
 private:
     GLFWwindow *window = nullptr;
+    GLFWimage windowIcon;
     VkInstance instance = NULL;
     VkDebugUtilsMessengerEXT debugMessenger = nullptr;
     uint32_t glfwExtensionCount = 0;
