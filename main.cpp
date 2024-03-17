@@ -1,6 +1,6 @@
 // Labellum Engine 🌺 (Formerly Azalea Engine... Formerly formerly Abisko Engine❄️) - Vilhelm Hansson / Vespera Chromatic -- Started 18-11-2023
 
-// cont https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/00_Setup/03_Physical_devices_and_queue_families.html
+// cont https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/01_Presentation/00_Window_surface.html
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -11,6 +11,8 @@
 #include <vector>
 #include <string>
 #include <chrono>
+#include <map>
+#include <optional>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -69,6 +71,8 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
     }
 }
 
+std::string intToBool(int nr);
+
 /// @brief Creates a triangle, lmao
 class HelloTriangleApplication
 {
@@ -108,6 +112,19 @@ private:
     VkDebugUtilsMessengerEXT debugMessenger = nullptr;
     uint32_t glfwExtensionCount = 0;
     const char **glfwExtensions = nullptr;
+    VkPhysicalDevice physicalDevice = nullptr;
+    VkDevice device = nullptr;
+    VkQueue graphicsQueue = nullptr;
+
+    struct QueueFamilyIndices
+    {
+        std::optional<uint32_t> graphicsFamily;
+
+        bool isComplete()
+        {
+            return graphicsFamily.has_value();
+        }
+    };
 
     std::vector<const char *> getRequiredExtensions()
     {
@@ -226,6 +243,8 @@ private:
     {
         createInstance();
         setupDebugMessenger();
+        pickPhysicalDevice();
+        createLogicalDevice();
     }
 
     void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo)
@@ -255,6 +274,137 @@ private:
         }
     }
 
+    void pickPhysicalDevice()
+    {
+        // Listing available graphics cards
+        uint32_t deviceCount = 0;
+        vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+
+        // If no graphics cards with vulkan support is found, throw error
+        if (deviceCount == 0)
+        {
+            throw std::runtime_error("No GPU with Vulkan support was found.");
+        }
+        
+        // Allocate an array that holds our VkPhysicalDevice(s)
+        std::vector<VkPhysicalDevice> devices(deviceCount);
+        vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+
+        // Check if the found devices meet the requirements for Labellum Engine
+        for (const auto &device : devices)
+        {
+            if (isDeviceSuitable(device) != 0)
+            {
+                physicalDevice = device;
+                break;
+            }   
+        }
+        if (physicalDevice == nullptr)
+        {
+            throw std::runtime_error("The found GPU(s) are not suitable to run Labellum Engine.");
+        }
+        
+    }
+
+    int rateDeviceSuitability(VkPhysicalDevice device)
+    {
+        int score = 0;
+
+        VkPhysicalDeviceProperties deviceProperties;
+        VkPhysicalDeviceFeatures deviceFeatures;
+        vkGetPhysicalDeviceProperties(device, &deviceProperties);
+        vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+        
+        if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+        {
+            score += 1000;
+        }
+        score += deviceProperties.limits.maxImageDimension2D;
+        if (!deviceFeatures.geometryShader)
+        {
+            return 0;
+        }
+        
+        std::cout << "Graphics Card Name: " << deviceProperties.deviceName << std::endl;
+        std::cout << "Max Image Dimension 2D: " << deviceProperties.limits.maxImageDimension2D << std::endl;
+        std::cout << "Support for Tessellation Shader: " << intToBool(deviceFeatures.tessellationShader) << std::endl;
+
+        return score;
+    }
+
+    bool isDeviceSuitable(VkPhysicalDevice device)
+    {
+        QueueFamilyIndices indices = findQueueFamilies(device);
+
+        return indices.isComplete();
+    }
+
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device)
+    {
+        QueueFamilyIndices indices;
+
+        // Logic to find graphics queue family
+        uint32_t queueFamilyCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+        int i = 0;
+        for (const auto& queueFamily : queueFamilies)
+        {
+            if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+            {
+                indices.graphicsFamily = i;
+            }
+            if (indices.isComplete())
+            {
+                break;
+            }
+            i++;
+        }
+        return indices;
+    }
+
+    void createLogicalDevice()
+    {
+        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+        float queuePriority = 1.0f;
+
+        VkDeviceQueueCreateInfo queueCreateInfo{};
+        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+
+        VkPhysicalDeviceFeatures deviceFeatures{};
+
+        VkDeviceCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+        createInfo.pQueueCreateInfos = &queueCreateInfo;
+        createInfo.queueCreateInfoCount = 1;
+        createInfo.pEnabledFeatures = &deviceFeatures;
+        // Ignored by modern Vulkan applications. They are only set to ensure compatibillity with older vulkan --------------------------------------
+        createInfo.enabledExtensionCount = 0;
+        if (enableValidationLayers)
+        {
+            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+            createInfo.ppEnabledLayerNames = validationLayers.data();
+        }
+        else
+        {
+            createInfo.enabledLayerCount = 0;
+        }
+        // ------------------------------------------------------------------------------------------------------------------------------------------
+        
+        if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to create logical device.");
+        }
+        vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
+
+    }
+
     void mainLoop()
     {
         while (!glfwWindowShouldClose(window))
@@ -269,9 +419,9 @@ private:
         {
             DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
         }
+        vkDestroyDevice(device, nullptr);
         vkDestroyInstance(instance, nullptr);
         glfwDestroyWindow(window);
-
         glfwTerminate();
     }
 
@@ -305,7 +455,7 @@ int main(int argc, char *argv[])
         {
             checkArgs(argv, i);
         }
-        if (lumDebugMode == true)
+        if (lumDebugMode)
         {
             glfwSetWindowTitle(app.getWindow(), "Labellum Engine 🌺 - Debug Mode");
         }
@@ -341,5 +491,14 @@ void checkArgs(char *argv[], int argNr)
         std::cout << TC_LUM + "Labellum Engine 🌺 " + TC_INFO + "Debug Mode Enabled\n" + TC_RESET + "\t Build: " + std::to_string(BUILD_NR) + "\n" << std::endl;
         lumDebugMode = true;
         enableValidationLayers = true;
+    }
+}
+
+std::string intToBool(int nr)
+{
+    switch (nr)
+    {
+        case 0: return "False"; break;
+        case 1: return "True"; break;
     }
 }
