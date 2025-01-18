@@ -23,9 +23,9 @@
 // CONSTANT VARIABLES
 const uint16_t LUM_WINDOW_WIDTH = 800;
 const uint16_t LUM_WINDOW_HEIGHT = 600;
-const int BUILD_NR = 200124;
+const int BUILD_NR = 180125;
 
-//TERMINAL STUFF https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
+// TERMINAL STUFF https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
 const std::string TC_BELL = "\a🔔 ";
 const std::string TC_RED = "\x1B[38;5;1m";
 const std::string TC_GREEN = "\x1B[38;5;2m";
@@ -95,41 +95,43 @@ public:
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-        //Create Main Window
+        // Create Main Window
         window = glfwCreateWindow(LUM_WINDOW_WIDTH, LUM_WINDOW_HEIGHT, WINDOW_NAME.c_str(), nullptr, nullptr);
 
-        //Load window icon and set it
+        // Load window icon and set it
         windowIcon.pixels = stbi_load("LabellumIcon.png", &windowIcon.width, &windowIcon.height, 0, 4);
         glfwSetWindowIcon(window, 1, &windowIcon);
     }
 
-    GLFWwindow *getWindow()
+    GLFWwindow *getWindow() const
     {
         return this->window;
     }
 
 private:
-    GLFWwindow *window;
-    GLFWimage windowIcon;
-    VkInstance instance;
-    VkDebugUtilsMessengerEXT debugMessenger;
-    VkSurfaceKHR surface;
+    GLFWwindow *window = {};
+    GLFWimage windowIcon = {};
+    VkInstance instance = {};
+    VkDebugUtilsMessengerEXT debugMessenger = {};
+    VkSurfaceKHR surface = {};
     uint32_t glfwExtensionCount = 0;
     const char **glfwExtensions = nullptr;
-    VkPhysicalDevice physicalDevice;
-    VkDevice device;
-    VkQueue graphicsQueue;
-    VkQueue presentQueue;
+    VkPhysicalDevice physicalDevice = {};
+    VkDevice device = {};
+    VkQueue graphicsQueue = {};
+    VkQueue presentQueue = {};
+    VkSwapchainKHR swapChain = {};
+    std::vector<VkImage> swapChainImages = {};
 
     const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
-    const std::vector<const char*> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+    const std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
     struct QueueFamilyIndices
     {
         std::optional<uint32_t> graphicsFamily;
         std::optional<uint32_t> presentFamily;
 
-        bool isComplete()
+        bool isComplete() const
         {
             return graphicsFamily.has_value() && presentFamily.has_value();
         }
@@ -137,9 +139,9 @@ private:
 
     struct SwapChainSupportDetails
     {
-        VkSurfaceCapabilitiesKHR capabilities;
-        std::vector<VkSurfaceFormatKHR> formats;
-        std::vector<VkPresentModeKHR> presentModes;
+        VkSurfaceCapabilitiesKHR capabilities = {};
+        std::vector<VkSurfaceFormatKHR> formats = {};
+        std::vector<VkPresentModeKHR> presentModes = {};
     };
 
     std::vector<const char *> getRequiredExtensions()
@@ -212,7 +214,7 @@ private:
         appInfo.applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0);
         appInfo.pEngineName = "Labellum Engine";
         appInfo.engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0);
-        appInfo.apiVersion = VK_API_VERSION_1_3;
+        appInfo.apiVersion = VK_API_VERSION_1_4;
 
         glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
@@ -260,6 +262,61 @@ private:
         createSurface();
         pickPhysicalDevice();
         createLogicalDevice();
+        createSwapChain();
+    }
+
+    void createSwapChain()
+    {
+        SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
+
+        VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
+        VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
+        VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+
+        uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
+        if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount)
+        {
+            imageCount = swapChainSupport.capabilities.maxImageCount;
+        }
+
+        VkSwapchainCreateInfoKHR createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        createInfo.surface = surface;
+        createInfo.minImageCount = imageCount;
+        createInfo.imageFormat = surfaceFormat.format;
+        createInfo.imageColorSpace = surfaceFormat.colorSpace;
+        createInfo.imageExtent = extent;
+        createInfo.imageArrayLayers = 1;
+        createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+        uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+
+        if (indices.graphicsFamily != indices.presentFamily)
+        {
+            createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;  
+            createInfo.queueFamilyIndexCount = 2;
+            createInfo.pQueueFamilyIndices = queueFamilyIndices;
+        }
+        else
+        {
+            createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            createInfo.queueFamilyIndexCount = 0;
+            createInfo.pQueueFamilyIndices = nullptr;
+        }
+
+        createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
+        createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        createInfo.presentMode = presentMode;
+        createInfo.clipped = VK_TRUE;
+        createInfo.oldSwapchain = VK_NULL_HANDLE;
+
+        if(vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS)
+        {
+            throw std::runtime_error("Failed to create Swap chain.");
+        }
+
+        // continue: https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/01_Presentation/01_Swap_chain.html#:~:text=createInfo.imageUsage%20%3D%20VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT%3B-,The,-imageArrayLayers%20specifies%20the
     }
 
     void createSurface()
@@ -268,7 +325,6 @@ private:
         {
             throw std::runtime_error("Failed to create window surface.");
         }
-        
     }
 
     void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo)
@@ -309,7 +365,7 @@ private:
         {
             throw std::runtime_error("No GPU with Vulkan support was found.");
         }
-        
+
         // Allocate an array that holds our VkPhysicalDevice(s)
         std::vector<VkPhysicalDevice> devices(deviceCount);
         vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
@@ -321,13 +377,12 @@ private:
             {
                 physicalDevice = device;
                 break;
-            }   
+            }
         }
         if (physicalDevice == nullptr)
         {
             throw std::runtime_error("The found GPU(s) are not suitable to run Labellum Engine.");
         }
-        
     }
 
     int rateDeviceSuitability(VkPhysicalDevice device)
@@ -338,7 +393,7 @@ private:
         VkPhysicalDeviceFeatures deviceFeatures;
         vkGetPhysicalDeviceProperties(device, &deviceProperties);
         vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
-        
+
         if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
         {
             score += 1000;
@@ -348,7 +403,7 @@ private:
         {
             return 0;
         }
-        
+
         std::cout << "Graphics Card Name: " << deviceProperties.deviceName << std::endl;
         std::cout << "Max Image Dimension 2D: " << deviceProperties.limits.maxImageDimension2D << std::endl;
         std::cout << "Support for Tessellation Shader: " << intToBool(deviceFeatures.tessellationShader) << std::endl;
@@ -368,7 +423,6 @@ private:
             SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
             swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
         }
-        
 
         return indices.isComplete() && extensionsSupported && swapChainAdequate;
     }
@@ -383,11 +437,11 @@ private:
 
         std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
 
-        for (const auto& extension : availableExtensions)
+        for (const auto &extension : availableExtensions)
         {
             requiredExtensions.erase(extension.extensionName);
         }
-        
+
         return requiredExtensions.empty();
     }
 
@@ -403,7 +457,7 @@ private:
         vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
         int i = 0;
-        for (const auto& queueFamily : queueFamilies)
+        for (const auto &queueFamily : queueFamilies)
         {
             if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
             {
@@ -413,7 +467,8 @@ private:
             VkBool32 presentSupport = false;
             vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
 
-            if (presentSupport) {
+            if (presentSupport)
+            {
                 indices.presentFamily = i;
             }
 
@@ -440,18 +495,26 @@ private:
             details.formats.resize(formatCount);
             vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
         }
-        
+
+        uint32_t presentModeCount;
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+
+        if (presentModeCount != 0) {
+            details.presentModes.resize(presentModeCount);
+            vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
+        }
+
         return details;
     }
 
     VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats)
     {
-        for(const auto& availableFormat : availableFormats)
+        for (const auto &availableFormat : availableFormats)
         {
             if (availableFormat.format == VK_FORMAT_R8G8B8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
             {
                 return availableFormat;
-            }  
+            }
         }
 
         return availableFormats[0];
@@ -459,7 +522,7 @@ private:
 
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes)
     {
-        for(const auto& availablePresentMode : availablePresentModes)
+        for (const auto &availablePresentMode : availablePresentModes)
         {
             if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
             {
@@ -483,14 +546,13 @@ private:
 
             VkExtent2D actualExtent = {
                 static_cast<uint32_t>(width),
-                static_cast<uint32_t>(height)
-            };
+                static_cast<uint32_t>(height)};
 
             actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
             actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
-        
+
             return actualExtent;
-        }    
+        }
     }
 
     void createLogicalDevice()
@@ -500,11 +562,11 @@ private:
         std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
         std::set<uint32_t> uniqueQueueFamilies = {
             indices.graphicsFamily.value(),
-            indices.presentFamily.value()
-        };
+            indices.presentFamily.value()};
 
         float queuePriority = 1.0f;
-        for (uint32_t queueFamily : uniqueQueueFamilies) {
+        for (uint32_t queueFamily : uniqueQueueFamilies)
+        {
             VkDeviceQueueCreateInfo queueCreateInfo{};
             queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
             queueCreateInfo.queueFamilyIndex = queueFamily;
@@ -523,7 +585,7 @@ private:
 
         createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
         createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-        
+
         if (enableValidationLayers)
         {
             createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
@@ -540,7 +602,6 @@ private:
         }
         vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
         vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
-
     }
 
     void mainLoop()
@@ -557,6 +618,7 @@ private:
         {
             DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
         }
+        vkDestroySwapchainKHR(device, swapChain, nullptr);
         vkDestroyDevice(device, nullptr);
         vkDestroySurfaceKHR(instance, surface, nullptr);
         vkDestroyInstance(instance, nullptr);
@@ -578,6 +640,7 @@ private:
 
 // FUNCTION PROTOTYPES
 void checkArgs(char *argv[], int argNr);
+std::string intToBool(int nr);
 
 // ############################################
 // ############# START OF MAIN ################
@@ -587,7 +650,7 @@ int main(int argc, char *argv[])
     HelloTriangleApplication app;
     app.initWindow();
 
-    // Check Command Line Arguments ------------------------------------
+// Check Command Line Arguments ------------------------------------
     if (argc > 1)
     {
         for (int i = 1; i < argc; i++)
@@ -599,7 +662,7 @@ int main(int argc, char *argv[])
             glfwSetWindowTitle(app.getWindow(), "Labellum Engine 🌺 - Debug Mode");
         }
     }
-    // -----------------------------------------------------------------
+// -----------------------------------------------------------------
 
     try
     {
@@ -619,8 +682,8 @@ void checkArgs(char *argv[], int argNr)
 {
     std::string argument = argv[argNr];
 
-    //Help Arg
-    if (argument == "--help" || argument == "-h" || argument == "help"  || argument == "-help")
+    // Help Arg
+    if (argument == "--help" || argument == "-h" || argument == "help" || argument == "-help")
     {
         std::cout << TC_BELL + TC_CYAN + "Startup Arguments: \n \t -debug / -d : Debug Mode \n" + TC_RESET << std::endl;
     }
@@ -637,7 +700,12 @@ std::string intToBool(int nr)
 {
     switch (nr)
     {
-        case 0: return "False"; break;
-        case 1: return "True"; break;
+    case 0:
+        return "False";
+        break;
+    case 1:
+        return "True";
+        break;
     }
+    return "False";
 }

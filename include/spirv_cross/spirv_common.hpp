@@ -220,7 +220,7 @@ static inline std::string convert_to_string(int32_t value)
 	// INT_MIN is ... special on some backends. If we use a decimal literal, and negate it, we
 	// could accidentally promote the literal to long first, then negate.
 	// To workaround it, emit int(0x80000000) instead.
-	if (value == std::numeric_limits<int32_t>::min())
+	if (value == (std::numeric_limits<int32_t>::min)())
 		return "int(0x80000000)";
 	else
 		return std::to_string(value);
@@ -231,7 +231,7 @@ static inline std::string convert_to_string(int64_t value, const std::string &in
 	// INT64_MIN is ... special on some backends.
 	// If we use a decimal literal, and negate it, we might overflow the representable numbers.
 	// To workaround it, emit int(0x80000000) instead.
-	if (value == std::numeric_limits<int64_t>::min())
+	if (value == (std::numeric_limits<int64_t>::min)())
 		return join(int64_type, "(0x8000000000000000u", (long_long_literal_suffix ? "ll" : "l"), ")");
 	else
 		return std::to_string(value) + (long_long_literal_suffix ? "ll" : "l");
@@ -295,6 +295,20 @@ inline std::string convert_to_string(double t, char locale_radix_point)
 	return buf;
 }
 
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
+class FloatFormatter
+{
+public:
+	virtual ~FloatFormatter() = default;
+	virtual std::string format_float(float value) = 0;
+	virtual std::string format_double(double value) = 0;
+};
+
 template <typename T>
 struct ValueSaver
 {
@@ -317,12 +331,6 @@ struct ValueSaver
 	T &current;
 	T saved;
 };
-
-#if defined(__clang__) || defined(__GNUC__)
-#pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#pragma warning(pop)
-#endif
 
 struct Instruction
 {
@@ -540,6 +548,9 @@ struct SPIRType : IVariant
 		type = TypeType
 	};
 
+	spv::Op op = spv::Op::OpNop;
+	explicit SPIRType(spv::Op op_) : op(op_) {}
+
 	enum BaseType
 	{
 		Unknown,
@@ -567,7 +578,9 @@ struct SPIRType : IVariant
 		// Keep internal types at the end.
 		ControlPointArray,
 		Interpolant,
-		Char
+		Char,
+		// MSL specific type, that is used by 'object'(analog of 'task' from glsl) shader.
+		MeshGridProperties
 	};
 
 	// Scalar/vector/matrix support.
@@ -610,7 +623,7 @@ struct SPIRType : IVariant
 		uint32_t sampled;
 		spv::ImageFormat format;
 		spv::AccessQualifier access;
-	} image;
+	} image = {};
 
 	// Structs can be declared multiple times if they are used as part of interface blocks.
 	// We want to detect this so that we only emit the struct definition once.
@@ -734,6 +747,10 @@ struct SPIRExpression : IVariant
 
 	// A list of expressions which this expression depends on.
 	SmallVector<ID> expression_dependencies;
+
+	// Similar as expression dependencies, but does not stop the tracking for force-temporary variables.
+	// We need to know the full chain from store back to any SSA variable.
+	SmallVector<ID> invariance_dependencies;
 
 	// By reading this expression, we implicitly read these expressions as well.
 	// Used by access chain Store and Load since we read multiple expressions in this case.
@@ -1109,6 +1126,9 @@ struct SPIRVariable : IVariant
 	bool loop_variable = false;
 	// Set to true while we're inside the for loop.
 	bool loop_variable_enable = false;
+
+	// Used to find global LUTs
+	bool is_written_to = false;
 
 	SPIRFunction::Parameter *parameter = nullptr;
 
@@ -1584,6 +1604,8 @@ struct AccessChainMeta
 	bool flattened_struct = false;
 	bool relaxed_precision = false;
 	bool access_meshlet_position_y = false;
+	bool chain_is_builtin = false;
+	spv::BuiltIn builtin = {};
 };
 
 enum ExtendedDecorations
@@ -1657,6 +1679,8 @@ enum ExtendedDecorations
 	// lack of constructors in the 'threadgroup' address space.
 	SPIRVCrossDecorationWorkgroupStruct,
 
+	SPIRVCrossDecorationOverlappingBinding,
+
 	SPIRVCrossDecorationCount
 };
 
@@ -1685,6 +1709,7 @@ struct Meta
 		uint32_t index = 0;
 		spv::FPRoundingMode fp_rounding_mode = spv::FPRoundingModeMax;
 		bool builtin = false;
+		bool qualified_alias_explicit_override = false;
 
 		struct Extended
 		{
